@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.player4home.data.model.Playlist
 import com.player4home.data.model.PlaylistType
 import com.player4home.data.repository.PlaylistRepository
+import com.player4home.R
 import com.player4home.util.M3uParser
 import com.player4home.util.XtreamApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -129,20 +130,20 @@ class UploadViewModel @Inject constructor(
     private fun validate(state: UploadUiState): Boolean {
         var valid = true
         if (state.playlistName.isBlank()) {
-            _uiState.update { it.copy(nameError = "Playlist name cannot be empty") }
+            _uiState.update { it.copy(nameError = context.getString(R.string.upload_error_name_empty)) }
             valid = false
         }
         when (state.method) {
             UploadMethod.URL -> if (state.url.isBlank() || !android.util.Patterns.WEB_URL.matcher(state.url).matches()) {
-                _uiState.update { it.copy(urlError = "Please enter a valid URL") }
+                _uiState.update { it.copy(urlError = context.getString(R.string.upload_error_url_invalid)) }
                 valid = false
             }
             UploadMethod.FILE -> if (state.selectedFileUri == null) {
-                _uiState.update { it.copy(fileError = "Please select a file") }
+                _uiState.update { it.copy(fileError = context.getString(R.string.upload_error_file_empty)) }
                 valid = false
             }
             UploadMethod.XTREAM -> if (state.xtreamHost.isBlank() || state.xtreamUsername.isBlank()) {
-                _uiState.update { it.copy(xtreamError = "Host, username and password are required") }
+                _uiState.update { it.copy(xtreamError = context.getString(R.string.upload_error_xtream_credentials)) }
                 valid = false
             }
         }
