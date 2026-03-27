@@ -13,28 +13,25 @@ import javax.inject.Singleton
 class XtreamApi @Inject constructor(private val client: OkHttpClient) {
 
     suspend fun fetchLiveChannels(host: String, username: String, password: String, playlistId: Long): List<Channel> {
-        val url = "$host/player_api.php?username=$username&password=$password&action=get_live_streams"
-        return fetchChannels(url, host, username, password, StreamType.LIVE, playlistId)
+        val apiUrl = "$host/player_api.php?username=$username&password=$password&action=get_live_streams"
+        return fetchChannels(apiUrl, "$host/$username/$password", StreamType.LIVE, playlistId)
     }
 
     suspend fun fetchVodStreams(host: String, username: String, password: String, playlistId: Long): List<Channel> {
-        val url = "$host/player_api.php?username=$username&password=$password&action=get_vod_streams"
-        return fetchChannels(url, host, username, password, StreamType.VOD, playlistId)
+        val apiUrl = "$host/player_api.php?username=$username&password=$password&action=get_vod_streams"
+        return fetchChannels(apiUrl, "$host/$username/$password", StreamType.VOD, playlistId)
     }
 
     private suspend fun fetchChannels(
         url: String,
-        host: String,
-        username: String,
-        password: String,
+        streamUrlBase: String,
         type: StreamType,
         playlistId: Long
     ): List<Channel> = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder().url(url).build()
-            val response = client.newCall(request).execute()
+            val response = client.newCall(Request.Builder().url(url).build()).execute()
             val body = response.body?.string() ?: return@withContext emptyList()
-            parseJsonStreams(body, host, username, password, type, playlistId)
+            parseJsonStreams(body, streamUrlBase, type, playlistId)
         } catch (e: Exception) {
             emptyList()
         }
@@ -42,9 +39,7 @@ class XtreamApi @Inject constructor(private val client: OkHttpClient) {
 
     private fun parseJsonStreams(
         json: String,
-        host: String,
-        username: String,
-        password: String,
+        streamUrlBase: String,
         type: StreamType,
         playlistId: Long
     ): List<Channel> {
@@ -57,7 +52,7 @@ class XtreamApi @Inject constructor(private val client: OkHttpClient) {
                 Channel(
                     playlistId = playlistId,
                     name = obj.optString("name", "Unknown"),
-                    streamUrl = "$host/$username/$password/$streamId.$ext",
+                    streamUrl = "$streamUrlBase/$streamId.$ext",
                     logoUrl = obj.optString("stream_icon", ""),
                     groupTitle = obj.optString("category_name", ""),
                     streamType = type,

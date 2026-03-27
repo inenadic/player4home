@@ -42,11 +42,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.player4home.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,12 +74,12 @@ fun UploadScreen(
     LaunchedEffect(uiState.status) {
         when (uiState.status) {
             UploadStatus.SUCCESS -> {
-                snackbarHostState.showSnackbar("Playlist added successfully!")
+                snackbarHostState.showSnackbar(context.getString(R.string.upload_success))
                 viewModel.resetStatus()
                 navController.popBackStack()
             }
             UploadStatus.ERROR -> {
-                snackbarHostState.showSnackbar(uiState.errorMessage.ifBlank { "An error occurred" })
+                snackbarHostState.showSnackbar(uiState.errorMessage.ifBlank { context.getString(R.string.error_generic) })
                 viewModel.resetStatus()
             }
             else -> Unit
@@ -87,12 +89,12 @@ fun UploadScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add Playlist") },
+                title = { Text(stringResource(R.string.upload_title)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(R.string.action_back)
                         )
                     }
                 },
@@ -137,8 +139,8 @@ fun UploadScreen(
                 OutlinedTextField(
                     value = uiState.playlistName,
                     onValueChange = { viewModel.setName(it) },
-                    label = { Text("Playlist Name") },
-                    placeholder = { Text("My Playlist") },
+                    label = { Text(stringResource(R.string.upload_playlist_name)) },
+                    placeholder = { Text(stringResource(R.string.upload_playlist_name_hint)) },
                     singleLine = true,
                     isError = uiState.nameError.isNotEmpty(),
                     supportingText = {
@@ -231,8 +233,8 @@ private fun UrlSection(
     OutlinedTextField(
         value = url,
         onValueChange = onUrlChange,
-        label = { Text("Playlist URL") },
-        placeholder = { Text("https://example.com/playlist.m3u") },
+        label = { Text(stringResource(R.string.upload_url_label)) },
+        placeholder = { Text(stringResource(R.string.upload_url_hint)) },
         singleLine = true,
         isError = urlError.isNotEmpty(),
         supportingText = if (urlError.isNotEmpty()) {
