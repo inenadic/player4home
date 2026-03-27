@@ -12,12 +12,11 @@ object M3uParser {
     private val groupTitleRegex = Regex("""group-title="([^"]*)"""")
 
     fun parse(content: String, playlistId: Long = 0): List<Channel> {
-        val lines = content.lines()
         val channels = mutableListOf<Channel>()
         var currentMeta: String? = null
         var sortOrder = 0
 
-        for (line in lines) {
+        for (line in content.lineSequence()) {
             val trimmed = line.trim()
             when {
                 trimmed.startsWith("#EXTINF") -> {
