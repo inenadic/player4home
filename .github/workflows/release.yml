@@ -31,11 +31,19 @@ jobs:
           key: gradle-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Restore keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > player4home.jks
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/player4home.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
 
       - name: Rename APK
-        run: mv app/build/outputs/apk/debug/app-debug.apk player4home.apk
+        run: mv app/build/outputs/apk/release/app-release.apk player4home.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
