@@ -12,8 +12,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
@@ -22,7 +22,11 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,16 +36,18 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.player4home.R
-import com.player4home.data.model.Playlist
 import com.player4home.ui.navigation.Screen
 import com.player4home.ui.theme.*
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
@@ -86,7 +92,6 @@ fun HomeScreen(
                 val playlistId = uiState.recentPlaylists.first().id
                 HomeDashboard(
                     playlistId = playlistId,
-                    recentPlaylists = uiState.recentPlaylists,
                     navController = navController
                 )
             }
@@ -94,143 +99,191 @@ fun HomeScreen(
     }
 }
 
+// ── Live clock helper ──────────────────────────────────────────
+
+@Composable
+private fun rememberLiveClock(): String {
+    val formatter = remember {
+        DateTimeFormatter.ofPattern("EEEE | HH:mm", Locale.ENGLISH)
+    }
+    var timeText by remember {
+        mutableStateOf(LocalDateTime.now().format(formatter))
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L)
+            timeText = LocalDateTime.now().format(formatter)
+        }
+    }
+    return timeText
+}
+
+// ── Dashboard ─────────────────────────────────────────────────
+
 @Composable
 private fun HomeDashboard(
     playlistId: Long,
-    recentPlaylists: List<Playlist>,
     navController: NavController
 ) {
+    val timeText = rememberLiveClock()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        // Header
+        // ── Header ──────────────────────────────────────────────
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Left: logo + app name
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
                 Icon(
                     imageVector = Icons.Filled.PlayCircle,
                     contentDescription = null,
                     tint = TealPrimary,
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(28.dp)
                 )
                 Spacer(Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = OnNavy
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = OnNavy
+                )
+            }
+
+            // Center: live date + time
+            Text(
+                text = timeText,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Right: add playlist + settings icon buttons
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.weight(1f)
+            ) {
+                IconButton(onClick = { navController.navigate(Screen.Upload.route) }) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = "Add playlist",
+                        tint = TealPrimary,
+                        modifier = Modifier.size(24.dp)
                     )
-                    Text(
-                        text = "Your personal media hub",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = OnNavyVariant,
-                        letterSpacing = 0.3.sp
+                }
+                IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Settings",
+                        tint = OnNavyVariant,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
-            TextButton(onClick = { navController.navigate(Screen.Upload.route) }) {
-                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = TealPrimary)
-                Spacer(Modifier.width(4.dp))
-                Text("Add Playlist", color = TealPrimary, style = MaterialTheme.typography.labelLarge)
-            }
         }
 
-        // Recently Used section — shown only when playlists exist
-        if (recentPlaylists.isNotEmpty()) {
-            RecentlyUsedSection(playlists = recentPlaylists)
-        }
+        Spacer(Modifier.height(16.dp))
 
-        // Main category tiles — top row (3 large, colorful with glow)
+        // ── Main grid ───────────────────────────────────────────
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1.6f),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .fillMaxSize()
         ) {
+            // Left: Live TV — tall tile spanning full height
             TopCategoryTile(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier
+                    .weight(1.2f)
+                    .fillMaxHeight(),
                 label = "Live TV",
                 icon = Icons.Filled.Tv,
-                gradient = Brush.linearGradient(listOf(Color(0xFF00BFA5), Color(0xFF00838F))),
-                glowColor = Color(0xFF00D4AA),
-                onClick = { navController.navigate(Screen.PlaylistDetail.createRoute(playlistId, "LIVE")) }
+                gradient = Brush.linearGradient(
+                    listOf(Color(0xFF00BFA5), Color(0xFF006064))
+                ),
+                onClick = {
+                    navController.navigate(
+                        Screen.PlaylistDetail.createRoute(playlistId, "LIVE")
+                    )
+                }
             )
-            TopCategoryTile(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                label = "Movies",
-                icon = Icons.Filled.Movie,
-                gradient = Brush.linearGradient(listOf(Color(0xFFFF6B35), Color(0xFFE53935))),
-                glowColor = Color(0xFFFF6B35),
-                onClick = { navController.navigate(Screen.PlaylistDetail.createRoute(playlistId, "VOD")) }
-            )
-            TopCategoryTile(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                label = "Series",
-                icon = Icons.Filled.VideoLibrary,
-                gradient = Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFF512DA8))),
-                glowColor = Color(0xFF7B61FF),
-                onClick = { navController.navigate(Screen.PlaylistDetail.createRoute(playlistId, "SERIES")) }
-            )
-        }
 
-        // Bottom row (2 smaller, less prominent)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            BottomCategoryTile(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                label = "Settings",
-                icon = Icons.Filled.Settings,
-                gradient = Brush.linearGradient(listOf(Color(0xFF2A3A2A), Color(0xFF1B2A1B))),
-                iconSize = 32.dp,
-                onClick = { navController.navigate(Screen.Settings.route) }
-            )
-            BottomCategoryTile(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                label = "Playlists",
-                icon = Icons.AutoMirrored.Filled.List,
-                gradient = Brush.linearGradient(listOf(Color(0xFF1A2D2A), Color(0xFF0D1E1A))),
-                iconSize = 32.dp,
-                onClick = { navController.navigate(Screen.Playlists.route) }
-            )
-        }
-    }
-}
+            Spacer(Modifier.width(12.dp))
 
-// ── Recently Used section ──────────────────────────────────────
-
-@Composable
-private fun RecentlyUsedSection(playlists: List<Playlist>) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = "Recently Used",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = OnNavyVariant,
-            letterSpacing = 0.8.sp
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            playlists.take(3).forEach { playlist ->
-                Box(
+            // Right: 2-row column
+            Column(modifier = Modifier.weight(2f)) {
+                // Top row: Movies + Series (equal height)
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(NavyCard)
-                        .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .fillMaxWidth()
+                        .weight(1f)
                 ) {
-                    Text(
-                        text = playlist.name,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                        color = OnNavyVariant,
-                        maxLines = 1
+                    TopCategoryTile(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        label = "Movies",
+                        icon = Icons.Filled.Movie,
+                        gradient = Brush.linearGradient(
+                            listOf(Color(0xFFFF7043), Color(0xFFE53935))
+                        ),
+                        onClick = {
+                            navController.navigate(
+                                Screen.PlaylistDetail.createRoute(playlistId, "VOD")
+                            )
+                        }
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    TopCategoryTile(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        label = "Series",
+                        icon = Icons.Filled.VideoLibrary,
+                        gradient = Brush.linearGradient(
+                            listOf(Color(0xFF7B61FF), Color(0xFF4527A0))
+                        ),
+                        onClick = {
+                            navController.navigate(
+                                Screen.PlaylistDetail.createRoute(playlistId, "SERIES")
+                            )
+                        }
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Bottom row: Settings + Playlists flat buttons
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.5f)
+                ) {
+                    BottomCategoryTile(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        label = "Settings",
+                        icon = Icons.Filled.Settings,
+                        onClick = { navController.navigate(Screen.Settings.route) }
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    BottomCategoryTile(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        label = "Playlists",
+                        icon = Icons.AutoMirrored.Filled.List,
+                        onClick = { navController.navigate(Screen.Playlists.route) }
                     )
                 }
             }
@@ -238,7 +291,7 @@ private fun RecentlyUsedSection(playlists: List<Playlist>) {
     }
 }
 
-// ── Top (colorful) tile with shimmer glow + dark label overlay ─
+// ── Top (colorful) tile with shimmer + label overlay ──────────
 
 @Composable
 private fun TopCategoryTile(
@@ -246,10 +299,8 @@ private fun TopCategoryTile(
     label: String,
     icon: ImageVector,
     gradient: Brush,
-    glowColor: Color,
     onClick: () -> Unit
 ) {
-    // Shimmer animation — oscillates opacity on the top highlight stripe
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer_$label")
     val shimmerAlpha by infiniteTransition.animateFloat(
         initialValue = 0.08f,
@@ -263,47 +314,47 @@ private fun TopCategoryTile(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .border(1.dp, CardBorder, RoundedCornerShape(20.dp))
             .background(gradient)
             .clickable(onClick = onClick)
     ) {
-        // Shimmer highlight strip at top
+        // Shimmer highlight at top
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(36.dp)
+                .height(40.dp)
                 .align(Alignment.TopCenter)
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            glowColor.copy(alpha = shimmerAlpha),
+                            Color.White.copy(alpha = shimmerAlpha),
                             Color.Transparent
                         )
                     )
                 )
         )
 
-        // Icon — centred, weight-proportional via fillMaxSize fraction
+        // Icon — centered, fillMaxSize fraction
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 36.dp),
+                .padding(bottom = 40.dp),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.fillMaxSize(0.42f)
+                modifier = Modifier.fillMaxSize(0.38f)
             )
         }
 
-        // Dark overlay + label at bottom
+        // Dark gradient overlay + label at bottom
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(40.dp)
+                .height(44.dp)
                 .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
@@ -320,73 +371,44 @@ private fun TopCategoryTile(
                 textAlign = TextAlign.Center
             )
         }
-
-        // Subtle inner bottom shadow (purely visual depth layer)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(20.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color(0x33000000))
-                    )
-                )
-        )
     }
 }
 
-// ── Bottom (muted) tile ────────────────────────────────────────
+// ── Bottom flat button tile ────────────────────────────────────
 
 @Composable
 private fun BottomCategoryTile(
     modifier: Modifier = Modifier,
     label: String,
     icon: ImageVector,
-    gradient: Brush,
-    iconSize: Dp = 32.dp,
     onClick: () -> Unit
 ) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
-            .background(gradient)
+            .border(1.dp, Color(0xFF1E5C47), RoundedCornerShape(16.dp))
+            .background(Color(0xFF0D2B22))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = OnNavyVariant,
-                modifier = Modifier.size(iconSize)
+                tint = Color(0xFF4CAF50),
+                modifier = Modifier.size(24.dp)
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.width(12.dp))
             Text(
                 text = label,
-                color = OnNavyVariant,
+                color = Color(0xFFB0BEC5),
                 fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center
+                fontSize = 14.sp
             )
         }
-
-        // Subtle inner bottom shadow
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(16.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color(0x22000000))
-                    )
-                )
-        )
     }
 }
 

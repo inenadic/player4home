@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -553,10 +554,11 @@ private fun LiveList(
     onChannelClick: (Channel) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(channels, key = { it.id }) { channel ->
+        itemsIndexed(channels, key = { _, ch -> ch.id }) { index, channel ->
             ChannelRow(
                 channel = channel,
                 showGroupSubtitle = false,
+                channelNumber = index + 1,
                 onClick = { onChannelClick(channel) }
             )
             HorizontalDivider(

@@ -38,7 +38,8 @@ fun ChannelRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isCurrentlyPlaying: Boolean = false,
-    showGroupSubtitle: Boolean = true
+    showGroupSubtitle: Boolean = true,
+    channelNumber: Int? = null
 ) {
     val streamColor = when (channel.streamType) {
         StreamType.LIVE   -> LiveBadge
@@ -102,6 +103,18 @@ fun ChannelRow(
                         .background(TealPrimary.copy(alpha = pulseAlpha))
                 )
                 Spacer(Modifier.width(8.dp))
+            }
+
+            // Channel number — shown when provided (Smarters style)
+            if (channelNumber != null) {
+                Text(
+                    text = channelNumber.toString(),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = if (isCurrentlyPlaying) TealPrimary else OnNavyVariant,
+                    modifier = Modifier.width(32.dp),
+                    maxLines = 1
+                )
+                Spacer(Modifier.width(4.dp))
             }
 
             // Channel logo — rounded square with subtle border
