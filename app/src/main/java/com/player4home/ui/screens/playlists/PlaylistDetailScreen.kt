@@ -57,13 +57,13 @@ fun PlaylistDetailScreen(
                 .padding(innerPadding)
         ) {
             // Tab row
-            val tabs = listOf(
-                ChannelTab.ALL to stringResource(R.string.tab_all),
-                ChannelTab.LIVE to stringResource(R.string.tab_live),
-                ChannelTab.VOD to stringResource(R.string.tab_vod),
-                ChannelTab.SERIES to stringResource(R.string.tab_series)
+            val tabLabels = listOf(
+                stringResource(R.string.tab_all),
+                stringResource(R.string.tab_live),
+                stringResource(R.string.tab_vod),
+                stringResource(R.string.tab_series)
             )
-            val selectedIndex = tabs.indexOfFirst { it.first == uiState.selectedTab }.coerceAtLeast(0)
+            val selectedIndex = uiState.selectedTab.ordinal
 
             ScrollableTabRow(
                 selectedTabIndex = selectedIndex,
@@ -71,11 +71,11 @@ fun PlaylistDetailScreen(
                 contentColor = MaterialTheme.colorScheme.primary,
                 edgePadding = 0.dp
             ) {
-                tabs.forEachIndexed { index, (tab, label) ->
+                ChannelTab.entries.forEachIndexed { index, tab ->
                     Tab(
                         selected = selectedIndex == index,
                         onClick = { viewModel.onTabSelected(tab) },
-                        text = { Text(label) }
+                        text = { Text(tabLabels[index]) }
                     )
                 }
             }

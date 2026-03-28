@@ -112,7 +112,6 @@ fun UploadScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Method tab row
             val tabTitles = listOf("URL", "File", "Xtream")
             val selectedTabIndex = uiState.method.ordinal
             TabRow(
@@ -135,7 +134,6 @@ fun UploadScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // --- Common: Playlist Name ---
                 OutlinedTextField(
                     value = uiState.playlistName,
                     onValueChange = { viewModel.setName(it) },
@@ -166,7 +164,6 @@ fun UploadScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // --- Method-specific section ---
                 when (uiState.method) {
                     UploadMethod.URL -> UrlSection(
                         url = uiState.url,
@@ -191,7 +188,6 @@ fun UploadScreen(
                     )
                 }
 
-                // --- PIN Protection ---
                 PinSection(
                     pinProtected = uiState.pinProtected,
                     pin = uiState.pin,
