@@ -1,5 +1,7 @@
 package com.player4home.data.repository
 
+import androidx.room.withTransaction
+import com.player4home.data.db.AppDatabase
 import com.player4home.data.db.ChannelDao
 import com.player4home.data.db.PlaylistDao
 import com.player4home.data.model.Channel
@@ -10,6 +12,7 @@ import javax.inject.Singleton
 
 @Singleton
 class PlaylistRepository @Inject constructor(
+    private val db: AppDatabase,
     private val playlistDao: PlaylistDao,
     private val channelDao: ChannelDao
 ) {
@@ -17,15 +20,16 @@ class PlaylistRepository @Inject constructor(
 
     suspend fun getPlaylistById(id: Long): Playlist? = playlistDao.getPlaylistById(id)
 
-    suspend fun addPlaylist(playlist: Playlist, channels: List<Channel>): Long {
-        val id = playlistDao.insertPlaylist(playlist)
-        if (channels.isNotEmpty()) {
-            val mapped = channels.mapIndexed { i, ch -> ch.copy(playlistId = id, sortOrder = i) }
-            channelDao.insertChannels(mapped)
-            playlistDao.updateChannelCount(id, channels.size)
+    suspend fun addPlaylist(playlist: Playlist, channels: List<Channel>): Long =
+        db.withTransaction {
+            val id = playlistDao.insertPlaylist(playlist)
+            if (channels.isNotEmpty()) {
+                val mapped = channels.mapIndexed { i, ch -> ch.copy(playlistId = id, sortOrder = i) }
+                channelDao.insertChannels(mapped)
+                playlistDao.updateChannelCount(id, channels.size)
+            }
+            id
         }
-        return id
-    }
 
     suspend fun updatePlaylist(playlist: Playlist) = playlistDao.updatePlaylist(playlist)
 
