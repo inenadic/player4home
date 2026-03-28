@@ -21,12 +21,12 @@ enum class ChannelTab { ALL, LIVE, VOD, SERIES }
 
 data class PlaylistDetailUiState(
     val playlistName: String = "",
-    val channels: List<Channel> = emptyList(),
-    val groupedChannels: List<Pair<String, List<Channel>>> = emptyList(),
+    val groups: List<Pair<String, Int>> = emptyList(), // (name, channel count)
+    val selectedGroup: String? = null,                 // null = "ALL"
+    val channels: List<Channel> = emptyList(),         // filtered channels for right panel
     val isLoading: Boolean = true,
     val selectedTab: ChannelTab = ChannelTab.ALL,
-    val searchQuery: String = "",
-    val expandedGroups: Set<String> = emptySet()
+    val searchQuery: String = ""
 )
 
 @HiltViewModel
@@ -43,21 +43,28 @@ class PlaylistDetailViewModel @Inject constructor(
         else     -> ChannelTab.ALL
     }
 
-    private val _allChannels = MutableStateFlow<List<Channel>>(emptyList())
-    private val _selectedTab = MutableStateFlow(initialTab)
-    private val _searchQuery = MutableStateFlow("")
+    private val _allChannels  = MutableStateFlow<List<Channel>>(emptyList())
+    private val _selectedTab  = MutableStateFlow(initialTab)
+    private val _searchQuery  = MutableStateFlow("")
+    private val _selectedGroup = MutableStateFlow<String?>(null)
 
     private val _uiState = MutableStateFlow(PlaylistDetailUiState())
     val uiState: StateFlow<PlaylistDetailUiState> = _uiState.asStateFlow()
 
+    private data class ComputedState(
+        val groups: List<Pair<String, Int>>,
+        val channels: List<Channel>,
+        val tab: ChannelTab,
+        val query: String,
+        val selectedGroup: String?
+    )
+
     init {
-        // Load playlist name
         viewModelScope.launch {
             val playlist = repository.getPlaylistById(playlistId)
             _uiState.update { it.copy(playlistName = playlist?.name.orEmpty()) }
         }
 
-        // Collect all channels for this playlist
         repository.getChannelsForPlaylist(playlistId)
             .onEach { channels ->
                 _allChannels.value = channels
@@ -65,34 +72,33 @@ class PlaylistDetailViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
-        // Combine channels, tab, and search query into filtered result
-        combine(_allChannels, _selectedTab, _searchQuery) { channels, tab, query ->
+        combine(_allChannels, _selectedTab, _searchQuery, _selectedGroup) { channels, tab, query, group ->
             val tabFiltered = when (tab) {
-                ChannelTab.ALL -> channels
-                ChannelTab.LIVE -> channels.filter { it.streamType == StreamType.LIVE }
-                ChannelTab.VOD -> channels.filter { it.streamType == StreamType.VOD }
+                ChannelTab.ALL    -> channels
+                ChannelTab.LIVE   -> channels.filter { it.streamType == StreamType.LIVE }
+                ChannelTab.VOD    -> channels.filter { it.streamType == StreamType.VOD }
                 ChannelTab.SERIES -> channels.filter { it.streamType == StreamType.SERIES }
             }
-            val queryFiltered = if (query.isBlank()) {
-                tabFiltered
-            } else {
-                tabFiltered.filter { it.name.contains(query, ignoreCase = true) }
-            }
-            Triple(queryFiltered, tab, query)
+            val groupedMap = tabFiltered.groupBy { it.groupTitle.ifEmpty { "—" } }
+            val groups = listOf("ALL" to tabFiltered.size) +
+                         groupedMap.entries.map { it.key to it.value.size }
+
+            val groupFiltered = if (group == null) tabFiltered
+                                else groupedMap[group] ?: tabFiltered
+
+            val displayed = if (query.isBlank()) groupFiltered
+                            else groupFiltered.filter { it.name.contains(query, ignoreCase = true) }
+
+            ComputedState(groups, displayed, tab, query, group)
         }
-            .onEach { (filtered, tab, query) ->
-                val grouped = filtered
-                    .groupBy { it.groupTitle.ifEmpty { "—" } }
-                    .entries.map { it.key to it.value }
-                _uiState.update { current ->
-                    current.copy(
-                        channels = filtered,
-                        groupedChannels = grouped,
+            .onEach { (groups, channels, tab, query, group) ->
+                _uiState.update {
+                    it.copy(
+                        groups = groups,
+                        channels = channels,
                         selectedTab = tab,
                         searchQuery = query,
-                        // auto-expand all groups when user is searching
-                        expandedGroups = if (query.isNotBlank()) grouped.map { it.first }.toSet()
-                                         else current.expandedGroups
+                        selectedGroup = group
                     )
                 }
             }
@@ -101,17 +107,14 @@ class PlaylistDetailViewModel @Inject constructor(
 
     fun onTabSelected(tab: ChannelTab) {
         _selectedTab.value = tab
+        _selectedGroup.value = null
+    }
+
+    fun onGroupSelected(group: String?) {
+        _selectedGroup.value = group
     }
 
     fun onSearch(query: String) {
         _searchQuery.value = query
-    }
-
-    fun onGroupToggled(group: String) {
-        _uiState.update { current ->
-            val set = current.expandedGroups.toMutableSet()
-            if (group in set) set.remove(group) else set.add(group)
-            current.copy(expandedGroups = set)
-        }
     }
 }

@@ -33,7 +33,7 @@ fun ChannelRow(
     showGroupSubtitle: Boolean = true
 ) {
     val streamColor = when (channel.streamType) {
-        StreamType.LIVE   -> TealPrimary
+        StreamType.LIVE   -> LiveBadge
         StreamType.VOD    -> VodBadge
         StreamType.SERIES -> SeriesBadge
     }
