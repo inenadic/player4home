@@ -19,8 +19,11 @@ private val DarkColorScheme = darkColorScheme(
     onSurface = OnNavy,
     surfaceVariant = NavySurfaceVariant,
     onSurfaceVariant = OnNavyVariant,
+    outline = CardBorder,
+    outlineVariant = Divider,
     error = ErrorColor,
-    onError = OnTeal
+    onError = OnTeal,
+    scrim = NavyBackground
 )
 
 @Composable
