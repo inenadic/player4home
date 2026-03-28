@@ -25,7 +25,8 @@ class PlaylistRepository @Inject constructor(
             val id = playlistDao.insertPlaylist(playlist)
             if (channels.isNotEmpty()) {
                 val mapped = channels.mapIndexed { i, ch -> ch.copy(playlistId = id, sortOrder = i) }
-                channelDao.insertChannels(mapped)
+                // Insert in batches of 500 to avoid SQLite variable limits
+                mapped.chunked(500).forEach { batch -> channelDao.insertChannels(batch) }
                 playlistDao.updateChannelCount(id, channels.size)
             }
             id

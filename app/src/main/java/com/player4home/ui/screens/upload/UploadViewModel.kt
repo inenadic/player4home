@@ -88,11 +88,16 @@ class UploadViewModel @Inject constructor(
     }
 
     private suspend fun saveUrlPlaylist(state: UploadUiState) {
-        val content = withContext(Dispatchers.IO) {
-            httpClient.newCall(Request.Builder().url(state.url).build())
-                .execute().body?.string() ?: throw Exception("Empty response")
+        val channels = withContext(Dispatchers.IO) {
+            val response = httpClient.newCall(Request.Builder().url(state.url).build()).execute()
+            if (!response.isSuccessful) throw Exception("Server error: ${response.code}")
+            val body = response.body ?: throw Exception("Empty response from server")
+            // Stream-parse: never load entire file into memory
+            body.source().inputStream().bufferedReader().use { reader ->
+                M3uParser.parse(reader)
+            }
         }
-        val channels = M3uParser.parse(content)
+        if (channels.isEmpty()) throw Exception("No channels found. Check the URL format.")
         repository.addPlaylist(
             Playlist(name = state.playlistName, type = PlaylistType.URL, url = state.url,
                 isPinProtected = state.pinProtected, pin = state.pin),
@@ -102,9 +107,12 @@ class UploadViewModel @Inject constructor(
 
     private suspend fun saveFilePlaylist(state: UploadUiState) {
         val uri = state.selectedFileUri ?: throw Exception("No file selected")
-        val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
-            ?: throw Exception("Cannot read file")
-        val channels = M3uParser.parse(content)
+        val channels = withContext(Dispatchers.IO) {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                M3uParser.parse(reader)
+            } ?: throw Exception("Cannot read file")
+        }
+        if (channels.isEmpty()) throw Exception("No channels found in file.")
         repository.addPlaylist(
             Playlist(name = state.playlistName, type = PlaylistType.FILE, filePath = uri.toString(),
                 isPinProtected = state.pinProtected, pin = state.pin),
