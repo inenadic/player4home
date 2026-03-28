@@ -1,5 +1,6 @@
 package com.player4home.ui.screens.settings
 
+import com.player4home.BuildConfig
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -141,7 +142,7 @@ fun SettingsScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Text(
-                    text = "Version 1.0",
+                    text = "Version ${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
