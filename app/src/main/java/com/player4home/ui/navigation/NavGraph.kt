@@ -15,15 +15,15 @@ import com.player4home.ui.screens.settings.SettingsScreen
 import com.player4home.ui.screens.upload.UploadScreen
 
 sealed class Screen(val route: String) {
-    data object Home : Screen("home")
-    data object Playlists : Screen("playlists")
-    data object Upload : Screen("upload")
-    data object Settings : Screen("settings")
-    data object Player : Screen("player/{playlistId}/{channelId}") {
+    data object Home       : Screen("home")
+    data object Playlists  : Screen("playlists")
+    data object Upload     : Screen("upload")
+    data object Settings   : Screen("settings")
+    data object Player     : Screen("player/{playlistId}/{channelId}") {
         fun createRoute(playlistId: Long, channelId: Long) = "player/$playlistId/$channelId"
     }
-    data object PlaylistDetail : Screen("playlist/{playlistId}") {
-        fun createRoute(playlistId: Long) = "playlist/$playlistId"
+    data object PlaylistDetail : Screen("playlist/{playlistId}?tab={tab}") {
+        fun createRoute(playlistId: Long, tab: String = "ALL") = "playlist/$playlistId?tab=$tab"
     }
 }
 
@@ -45,7 +45,8 @@ fun NavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
         composable(
             route = Screen.PlaylistDetail.route,
             arguments = listOf(
-                navArgument("playlistId") { type = NavType.LongType }
+                navArgument("playlistId") { type = NavType.LongType },
+                navArgument("tab") { type = NavType.StringType; defaultValue = "ALL" }
             )
         ) {
             PlaylistDetailScreen(navController = navController)
@@ -54,15 +55,15 @@ fun NavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
             route = Screen.Player.route,
             arguments = listOf(
                 navArgument("playlistId") { type = NavType.LongType },
-                navArgument("channelId") { type = NavType.LongType }
+                navArgument("channelId")  { type = NavType.LongType }
             )
         ) { backStack ->
             val playlistId = backStack.arguments?.getLong("playlistId") ?: 0L
-            val channelId = backStack.arguments?.getLong("channelId") ?: 0L
+            val channelId  = backStack.arguments?.getLong("channelId")  ?: 0L
             PlayerScreen(
                 playlistId = playlistId,
-                channelId = channelId,
-                onBack = { navController.popBackStack() }
+                channelId  = channelId,
+                onBack     = { navController.popBackStack() }
             )
         }
     }

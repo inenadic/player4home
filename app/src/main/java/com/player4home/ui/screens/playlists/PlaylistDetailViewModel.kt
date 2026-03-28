@@ -34,9 +34,15 @@ class PlaylistDetailViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val playlistId: Long = checkNotNull(savedStateHandle["playlistId"])
+    private val initialTab: ChannelTab = when (savedStateHandle.get<String>("tab")) {
+        "LIVE"   -> ChannelTab.LIVE
+        "VOD"    -> ChannelTab.VOD
+        "SERIES" -> ChannelTab.SERIES
+        else     -> ChannelTab.ALL
+    }
 
     private val _allChannels = MutableStateFlow<List<Channel>>(emptyList())
-    private val _selectedTab = MutableStateFlow(ChannelTab.ALL)
+    private val _selectedTab = MutableStateFlow(initialTab)
     private val _searchQuery = MutableStateFlow("")
 
     private val _uiState = MutableStateFlow(PlaylistDetailUiState())
