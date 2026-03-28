@@ -29,7 +29,8 @@ fun ChannelRow(
     channel: Channel,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isCurrentlyPlaying: Boolean = false
+    isCurrentlyPlaying: Boolean = false,
+    showGroupSubtitle: Boolean = true
 ) {
     val streamColor = when (channel.streamType) {
         StreamType.LIVE   -> TealPrimary
@@ -92,7 +93,7 @@ fun ChannelRow(
                 overflow = TextOverflow.Ellipsis,
                 color = if (isCurrentlyPlaying) TealPrimary else OnNavy
             )
-            if (channel.groupTitle.isNotEmpty()) {
+            if (showGroupSubtitle && channel.groupTitle.isNotEmpty()) {
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = channel.groupTitle,

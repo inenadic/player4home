@@ -22,9 +22,11 @@ enum class ChannelTab { ALL, LIVE, VOD, SERIES }
 data class PlaylistDetailUiState(
     val playlistName: String = "",
     val channels: List<Channel> = emptyList(),
+    val groupedChannels: List<Pair<String, List<Channel>>> = emptyList(),
     val isLoading: Boolean = true,
     val selectedTab: ChannelTab = ChannelTab.ALL,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val expandedGroups: Set<String> = emptySet()
 )
 
 @HiltViewModel
@@ -79,7 +81,20 @@ class PlaylistDetailViewModel @Inject constructor(
             Triple(queryFiltered, tab, query)
         }
             .onEach { (filtered, tab, query) ->
-                _uiState.update { it.copy(channels = filtered, selectedTab = tab, searchQuery = query) }
+                val grouped = filtered
+                    .groupBy { it.groupTitle.ifEmpty { "—" } }
+                    .entries.map { it.key to it.value }
+                _uiState.update { current ->
+                    current.copy(
+                        channels = filtered,
+                        groupedChannels = grouped,
+                        selectedTab = tab,
+                        searchQuery = query,
+                        // auto-expand all groups when user is searching
+                        expandedGroups = if (query.isNotBlank()) grouped.map { it.first }.toSet()
+                                         else current.expandedGroups
+                    )
+                }
             }
             .launchIn(viewModelScope)
     }
@@ -90,5 +105,13 @@ class PlaylistDetailViewModel @Inject constructor(
 
     fun onSearch(query: String) {
         _searchQuery.value = query
+    }
+
+    fun onGroupToggled(group: String) {
+        _uiState.update { current ->
+            val set = current.expandedGroups.toMutableSet()
+            if (group in set) set.remove(group) else set.add(group)
+            current.copy(expandedGroups = set)
+        }
     }
 }
