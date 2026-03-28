@@ -1,12 +1,19 @@
 package com.player4home.ui.screens.home
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
@@ -32,6 +39,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.player4home.R
+import com.player4home.data.model.Playlist
 import com.player4home.ui.navigation.Screen
 import com.player4home.ui.theme.*
 
@@ -78,6 +86,7 @@ fun HomeScreen(
                 val playlistId = uiState.recentPlaylists.first().id
                 HomeDashboard(
                     playlistId = playlistId,
+                    recentPlaylists = uiState.recentPlaylists,
                     navController = navController
                 )
             }
@@ -88,6 +97,7 @@ fun HomeScreen(
 @Composable
 private fun HomeDashboard(
     playlistId: Long,
+    recentPlaylists: List<Playlist>,
     navController: NavController
 ) {
     Column(
@@ -107,14 +117,22 @@ private fun HomeDashboard(
                     imageVector = Icons.Filled.PlayCircle,
                     contentDescription = null,
                     tint = TealPrimary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(26.dp)
                 )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = OnNavy
-                )
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = OnNavy
+                    )
+                    Text(
+                        text = "Your personal media hub",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = OnNavyVariant,
+                        letterSpacing = 0.3.sp
+                    )
+                }
             }
             TextButton(onClick = { navController.navigate(Screen.Upload.route) }) {
                 Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = TealPrimary)
@@ -123,58 +141,64 @@ private fun HomeDashboard(
             }
         }
 
-        Spacer(Modifier.height(4.dp))
+        // Recently Used section — shown only when playlists exist
+        if (recentPlaylists.isNotEmpty()) {
+            RecentlyUsedSection(playlists = recentPlaylists)
+        }
 
-        // Main category tiles — top row (3 large)
+        // Main category tiles — top row (3 large, colorful with glow)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1.6f),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            CategoryTile(
+            TopCategoryTile(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 label = "Live TV",
                 icon = Icons.Filled.Tv,
                 gradient = Brush.linearGradient(listOf(Color(0xFF00BFA5), Color(0xFF00838F))),
+                glowColor = Color(0xFF00D4AA),
                 onClick = { navController.navigate(Screen.PlaylistDetail.createRoute(playlistId, "LIVE")) }
             )
-            CategoryTile(
+            TopCategoryTile(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 label = "Movies",
                 icon = Icons.Filled.Movie,
                 gradient = Brush.linearGradient(listOf(Color(0xFFFF6B35), Color(0xFFE53935))),
+                glowColor = Color(0xFFFF6B35),
                 onClick = { navController.navigate(Screen.PlaylistDetail.createRoute(playlistId, "VOD")) }
             )
-            CategoryTile(
+            TopCategoryTile(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 label = "Series",
                 icon = Icons.Filled.VideoLibrary,
                 gradient = Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFF512DA8))),
+                glowColor = Color(0xFF7B61FF),
                 onClick = { navController.navigate(Screen.PlaylistDetail.createRoute(playlistId, "SERIES")) }
             )
         }
 
-        // Bottom row (2 smaller)
+        // Bottom row (2 smaller, less prominent)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            CategoryTile(
+            BottomCategoryTile(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 label = "Settings",
                 icon = Icons.Filled.Settings,
-                gradient = Brush.linearGradient(listOf(Color(0xFF43A047), Color(0xFF1B5E20))),
+                gradient = Brush.linearGradient(listOf(Color(0xFF2A3A2A), Color(0xFF1B2A1B))),
                 iconSize = 32.dp,
                 onClick = { navController.navigate(Screen.Settings.route) }
             )
-            CategoryTile(
+            BottomCategoryTile(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 label = "Playlists",
-                icon = Icons.Filled.List,
-                gradient = Brush.linearGradient(listOf(Color(0xFF00897B), Color(0xFF004D40))),
+                icon = Icons.AutoMirrored.Filled.List,
+                gradient = Brush.linearGradient(listOf(Color(0xFF1A2D2A), Color(0xFF0D1E1A))),
                 iconSize = 32.dp,
                 onClick = { navController.navigate(Screen.Playlists.route) }
             )
@@ -182,18 +206,151 @@ private fun HomeDashboard(
     }
 }
 
+// ── Recently Used section ──────────────────────────────────────
+
 @Composable
-private fun CategoryTile(
+private fun RecentlyUsedSection(playlists: List<Playlist>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "Recently Used",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = OnNavyVariant,
+            letterSpacing = 0.8.sp
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            playlists.take(3).forEach { playlist ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(NavyCard)
+                        .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = playlist.name,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                        color = OnNavyVariant,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── Top (colorful) tile with shimmer glow + dark label overlay ─
+
+@Composable
+private fun TopCategoryTile(
     modifier: Modifier = Modifier,
     label: String,
     icon: ImageVector,
     gradient: Brush,
-    iconSize: Dp = 48.dp,
+    glowColor: Color,
+    onClick: () -> Unit
+) {
+    // Shimmer animation — oscillates opacity on the top highlight stripe
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer_$label")
+    val shimmerAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.08f,
+        targetValue = 0.22f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmerAlpha_$label"
+    )
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+            .background(gradient)
+            .clickable(onClick = onClick)
+    ) {
+        // Shimmer highlight strip at top
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            glowColor.copy(alpha = shimmerAlpha),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        // Icon — centred, weight-proportional via fillMaxSize fraction
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 36.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.fillMaxSize(0.42f)
+            )
+        }
+
+        // Dark overlay + label at bottom
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color(0xCC000000))
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        // Subtle inner bottom shadow (purely visual depth layer)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(20.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color(0x33000000))
+                    )
+                )
+        )
+    }
+}
+
+// ── Bottom (muted) tile ────────────────────────────────────────
+
+@Composable
+private fun BottomCategoryTile(
+    modifier: Modifier = Modifier,
+    label: String,
+    icon: ImageVector,
+    gradient: Brush,
+    iconSize: Dp = 32.dp,
     onClick: () -> Unit
 ) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
             .background(gradient)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
@@ -205,20 +362,35 @@ private fun CategoryTile(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color.White,
+                tint = OnNavyVariant,
                 modifier = Modifier.size(iconSize)
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = label,
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
+                color = OnNavyVariant,
+                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp,
                 textAlign = TextAlign.Center
             )
         }
+
+        // Subtle inner bottom shadow
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(16.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color(0x22000000))
+                    )
+                )
+        )
     }
 }
+
+// ── Empty state ────────────────────────────────────────────────
 
 @Composable
 private fun HomeEmptyState(

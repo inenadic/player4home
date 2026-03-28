@@ -1,20 +1,28 @@
 package com.player4home.ui.screens.playlists
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -23,8 +31,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.player4home.R
 import com.player4home.data.model.Channel
+import com.player4home.data.model.StreamType
 import com.player4home.ui.components.ChannelRow
 import com.player4home.ui.navigation.Screen
 import com.player4home.ui.theme.*
@@ -84,6 +94,12 @@ fun PlaylistDetailScreen(
                         ChannelTab.SERIES -> "SERIES"
                     },
                     selected = uiState.selectedTab == tab,
+                    accentColor = when (tab) {
+                        ChannelTab.ALL    -> TealPrimary
+                        ChannelTab.LIVE   -> LiveBadge
+                        ChannelTab.VOD    -> VodBadge
+                        ChannelTab.SERIES -> SeriesBadge
+                    },
                     onClick = { viewModel.onTabSelected(tab) }
                 )
             }
@@ -123,6 +139,7 @@ fun PlaylistDetailScreen(
                         .fillMaxHeight(),
                     channels = uiState.channels,
                     searchQuery = uiState.searchQuery,
+                    selectedTab = uiState.selectedTab,
                     onSearch = { viewModel.onSearch(it) },
                     onChannelClick = { channel ->
                         navController.navigate(
@@ -138,17 +155,27 @@ fun PlaylistDetailScreen(
 // ── Type filter chip ──────────────────────────────────────────
 
 @Composable
-private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun TypeChip(
+    label: String,
+    selected: Boolean,
+    accentColor: Color,
+    onClick: () -> Unit
+) {
+    val bgColor = if (selected) accentColor.copy(alpha = 0.15f) else Color.Transparent
+    val textColor = if (selected) accentColor else OnNavyVariant
+    val borderColor = if (selected) accentColor.copy(alpha = 0.4f) else Color.Transparent
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(if (selected) TealContainer else Color.Transparent)
+            .background(bgColor)
+            .border(width = 1.dp, color = borderColor, shape = RoundedCornerShape(6.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 6.dp)
     ) {
         Text(
             text = label,
-            color = if (selected) TealPrimary else OnNavyVariant,
+            color = textColor,
             style = MaterialTheme.typography.labelLarge.copy(
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
             )
@@ -172,22 +199,35 @@ private fun CategoriesPanel(
                   }
 
     Column(modifier = modifier.background(NavySurface)) {
+        // Section header
+        Text(
+            text = "CATEGORIES",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp
+            ),
+            color = OnNavySubtle,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 15.dp, top = 12.dp, bottom = 6.dp)
+        )
+
         // Search groups
         OutlinedTextField(
             value = filterText,
             onValueChange = { filterText = it },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             placeholder = {
                 Text(
-                    "Search categories",
+                    "Filter…",
                     color = OnNavySubtle,
                     style = MaterialTheme.typography.bodySmall
                 )
             },
             leadingIcon = {
-                Icon(Icons.Filled.Search, null, tint = OnNavyVariant, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Search, null, tint = OnNavyVariant, modifier = Modifier.size(16.dp))
             },
             singleLine = true,
             shape = RoundedCornerShape(8.dp),
@@ -232,7 +272,7 @@ private fun CategoryItem(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .background(if (isSelected) TealContainer else Color.Transparent)
-            .padding(end = 12.dp, top = 11.dp, bottom = 11.dp),
+            .padding(end = 10.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Selection accent bar
@@ -245,7 +285,7 @@ private fun CategoryItem(
                     RoundedCornerShape(topEnd = 2.dp, bottomEnd = 2.dp)
                 )
         )
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(10.dp))
         Text(
             text = name,
             color = if (isSelected) TealPrimary else OnNavyVariant,
@@ -256,11 +296,25 @@ private fun CategoryItem(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Text(
-            text = count.toString(),
-            color = if (isSelected) TealPrimary.copy(alpha = 0.7f) else OnNavySubtle,
-            style = MaterialTheme.typography.labelMedium
-        )
+        Spacer(Modifier.width(4.dp))
+        // Count badge — pill shape
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(
+                    if (isSelected) TealPrimary.copy(alpha = 0.18f)
+                    else NavyCardElevated
+                )
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = count.toString(),
+                color = if (isSelected) TealPrimary else OnNavyVariant,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                fontSize = 10.sp
+            )
+        }
     }
     HorizontalDivider(
         modifier = Modifier.padding(start = 15.dp),
@@ -276,11 +330,14 @@ private fun ChannelsPanel(
     modifier: Modifier,
     channels: List<Channel>,
     searchQuery: String,
+    selectedTab: ChannelTab,
     onSearch: (String) -> Unit,
     onChannelClick: (Channel) -> Unit
 ) {
+    val isGrid = selectedTab == ChannelTab.VOD || selectedTab == ChannelTab.SERIES
+
     Column(modifier = modifier.background(NavyBackground)) {
-        // Search channels
+        // Search bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearch,
@@ -290,7 +347,8 @@ private fun ChannelsPanel(
             placeholder = {
                 Text(
                     stringResource(R.string.search_channels_hint),
-                    color = OnNavySubtle
+                    color = OnNavySubtle,
+                    style = MaterialTheme.typography.bodyMedium
                 )
             },
             leadingIcon = {
@@ -319,27 +377,177 @@ private fun ChannelsPanel(
                 )
             }
         } else {
-            // Channel count
+            // Channel count line
             Text(
-                text = "${channels.size} channels",
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.5.sp),
+                text = "${channels.size} ${if (isGrid) "titles" else "channels"}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    letterSpacing = 0.5.sp,
+                    fontWeight = FontWeight.Medium
+                ),
                 color = OnNavySubtle,
-                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)
+                modifier = Modifier.padding(start = 16.dp, bottom = 6.dp)
             )
-            LazyColumn(Modifier.fillMaxSize()) {
-                items(channels, key = { it.id }) { channel ->
-                    ChannelRow(
-                        channel = channel,
-                        showGroupSubtitle = false,
-                        onClick = { onChannelClick(channel) }
+
+            if (isGrid) {
+                VodGrid(channels = channels, onChannelClick = onChannelClick)
+            } else {
+                LiveList(channels = channels, onChannelClick = onChannelClick)
+            }
+        }
+    }
+}
+
+// ── VOD / Series poster grid ──────────────────────────────────
+
+@Composable
+private fun VodGrid(
+    channels: List<Channel>,
+    onChannelClick: (Channel) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 140.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(channels, key = { it.id }) { channel ->
+            VodPosterCard(channel = channel, onClick = { onChannelClick(channel) })
+        }
+    }
+}
+
+@Composable
+private fun VodPosterCard(channel: Channel, onClick: () -> Unit) {
+    val badgeColor = when (channel.streamType) {
+        StreamType.VOD    -> VodBadge
+        StreamType.SERIES -> SeriesBadge
+        StreamType.LIVE   -> LiveBadge
+    }
+    val badgeLabel = when (channel.streamType) {
+        StreamType.VOD    -> "VOD"
+        StreamType.SERIES -> "SERIES"
+        StreamType.LIVE   -> "LIVE"
+    }
+    val fallbackIcon = when (channel.streamType) {
+        StreamType.VOD    -> Icons.Filled.Movie
+        StreamType.SERIES -> Icons.Filled.PlayArrow
+        StreamType.LIVE   -> Icons.Filled.PlayArrow
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = NavyCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column {
+            // Thumbnail / poster area (16:9 aspect)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+            ) {
+                if (channel.logoUrl.isNotEmpty()) {
+                    AsyncImage(
+                        model = channel.logoUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        color = Divider,
-                        thickness = 0.5.dp
+                } else {
+                    // Gradient background with icon when no logo
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(NavyCardElevated, NavySurface)
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = fallbackIcon,
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp),
+                            tint = badgeColor.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+
+                // Bottom gradient overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0f to Color.Transparent,
+                                    0.55f to Color.Transparent,
+                                    1f to Color(0xCC000000)
+                                )
+                            )
+                        )
+                )
+
+                // Stream type badge — top right
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(badgeColor.copy(alpha = 0.85f))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = badgeLabel,
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
                     )
                 }
             }
+
+            // Title below the image
+            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)) {
+                Text(
+                    text = channel.name,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = 16.sp
+                    ),
+                    color = OnNavy
+                )
+            }
+        }
+    }
+}
+
+// ── Live / ALL channel list ───────────────────────────────────
+
+@Composable
+private fun LiveList(
+    channels: List<Channel>,
+    onChannelClick: (Channel) -> Unit
+) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        items(channels, key = { it.id }) { channel ->
+            ChannelRow(
+                channel = channel,
+                showGroupSubtitle = false,
+                onClick = { onChannelClick(channel) }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 12.dp),
+                color = Divider,
+                thickness = 0.5.dp
+            )
         }
     }
 }
