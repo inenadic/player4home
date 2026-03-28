@@ -4,9 +4,15 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.player4home.data.model.Channel
+import com.player4home.data.model.PlaylistType
 import com.player4home.data.model.StreamType
 import com.player4home.data.repository.PlaylistRepository
+import com.player4home.util.M3uParser
+import com.player4home.util.XtreamApi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,6 +21,9 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import javax.inject.Inject
 
 enum class ChannelTab { ALL, LIVE, VOD, SERIES }
@@ -25,6 +34,7 @@ data class PlaylistDetailUiState(
     val selectedGroup: String? = null,                 // null = "ALL"
     val channels: List<Channel> = emptyList(),         // filtered channels for right panel
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val selectedTab: ChannelTab = ChannelTab.ALL,
     val searchQuery: String = ""
 )
@@ -32,7 +42,9 @@ data class PlaylistDetailUiState(
 @HiltViewModel
 class PlaylistDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val repository: PlaylistRepository
+    private val repository: PlaylistRepository,
+    private val httpClient: OkHttpClient,
+    private val xtreamApi: XtreamApi
 ) : ViewModel() {
 
     private val playlistId: Long = checkNotNull(savedStateHandle["playlistId"])
@@ -116,5 +128,31 @@ class PlaylistDetailViewModel @Inject constructor(
 
     fun onSearch(query: String) {
         _searchQuery.value = query
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            val playlist = repository.getPlaylistById(playlistId) ?: return@launch
+            _uiState.update { it.copy(isRefreshing = true) }
+            try {
+                val channels: List<Channel> = when (playlist.type) {
+                    PlaylistType.URL -> withContext(Dispatchers.IO) {
+                        val response = httpClient.newCall(Request.Builder().url(playlist.url).build()).execute()
+                        if (!response.isSuccessful) throw Exception("Server error: ${response.code}")
+                        val body = response.body ?: throw Exception("Empty response")
+                        body.source().inputStream().bufferedReader().use { M3uParser.parse(it) }
+                    }
+                    PlaylistType.XTREAM -> coroutineScope {
+                        val live = async { xtreamApi.fetchLiveChannels(playlist.xtreamHost, playlist.xtreamUsername, playlist.xtreamPassword, 0) }
+                        val vod  = async { xtreamApi.fetchVodStreams(playlist.xtreamHost, playlist.xtreamUsername, playlist.xtreamPassword, 0) }
+                        live.await() + vod.await()
+                    }
+                    PlaylistType.FILE -> return@launch // can't re-read local file
+                }
+                repository.replaceChannels(playlistId, channels)
+            } finally {
+                _uiState.update { it.copy(isRefreshing = false) }
+            }
+        }
     }
 }

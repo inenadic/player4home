@@ -12,6 +12,12 @@ object M3uParser {
     private val tvgLogoRegex = Regex("""tvg-logo="([^"]*)"""")
     private val groupTitleRegex = Regex("""group-title="([^"]*)"""")
 
+    // Word-boundary patterns to avoid false matches (e.g. "VODAFONE" matching "VOD")
+    private val vodPattern    = Regex("""\bVOD\b""", RegexOption.IGNORE_CASE)
+    private val moviePattern  = Regex("""\bMovies?\b""", RegexOption.IGNORE_CASE)
+    private val seriesPattern = Regex("""\bSeries\b""", RegexOption.IGNORE_CASE)
+    private val showPattern   = Regex("""\bShows?\b""", RegexOption.IGNORE_CASE)
+
     // Stream-based parse — reads line by line without loading entire file into memory
     fun parse(reader: BufferedReader, playlistId: Long = 0): List<Channel> {
         val channels = mutableListOf<Channel>()
@@ -35,10 +41,10 @@ object M3uParser {
                     val logo     = tvgLogoRegex.find(meta)?.groupValues?.get(1) ?: ""
                     val group    = groupTitleRegex.find(meta)?.groupValues?.get(1) ?: ""
                     val streamType = when {
-                        group.contains("VOD", ignoreCase = true) ||
-                        group.contains("Movie", ignoreCase = true) -> StreamType.VOD
-                        group.contains("Series", ignoreCase = true) ||
-                        group.contains("Show", ignoreCase = true)  -> StreamType.SERIES
+                        seriesPattern.containsMatchIn(group) ||
+                        showPattern.containsMatchIn(group)   -> StreamType.SERIES
+                        vodPattern.containsMatchIn(group) ||
+                        moviePattern.containsMatchIn(group)  -> StreamType.VOD
                         else -> StreamType.LIVE
                     }
 

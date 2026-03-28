@@ -36,6 +36,14 @@ class PlaylistRepository @Inject constructor(
 
     suspend fun deletePlaylist(playlist: Playlist) = playlistDao.deletePlaylist(playlist)
 
+    suspend fun replaceChannels(playlistId: Long, channels: List<Channel>) =
+        db.withTransaction {
+            channelDao.deleteChannelsForPlaylist(playlistId)
+            val mapped = channels.mapIndexed { i, ch -> ch.copy(playlistId = playlistId, sortOrder = i) }
+            mapped.chunked(500).forEach { batch -> channelDao.insertChannels(batch) }
+            playlistDao.updateChannelCount(playlistId, channels.size)
+        }
+
     suspend fun markUsed(id: Long) = playlistDao.updateLastUsed(id)
 
     fun getChannelsForPlaylist(playlistId: Long) = channelDao.getChannelsByPlaylist(playlistId)

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -75,6 +76,21 @@ fun PlaylistDetailScreen(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+            if (uiState.isRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp).padding(end = 8.dp),
+                    color = TealPrimary,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                IconButton(onClick = { viewModel.refresh() }) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh playlist",
+                        tint = OnNavyVariant
+                    )
+                }
+            }
         }
 
         // ── Type filter chips ─────────────────────────────────
