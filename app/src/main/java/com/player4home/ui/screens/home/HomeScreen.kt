@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.*
@@ -40,6 +41,18 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Update dialog
+    uiState.updateAvailable?.let { update ->
+        UpdateDialog(
+            version = update.latestVersion,
+            downloadProgress = uiState.updateProgress,
+            errorMessage = uiState.updateError,
+            onUpdate = { viewModel.downloadAndInstall() },
+            onDismiss = { viewModel.dismissUpdate() },
+            onErrorDismiss = { viewModel.clearUpdateError() }
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -251,4 +264,89 @@ private fun HomeEmptyState(
             Text(stringResource(R.string.home_add_playlist))
         }
     }
+}
+
+// ── Update dialog ──────────────────────────────────────────────
+
+@Composable
+private fun UpdateDialog(
+    version: String,
+    downloadProgress: Int?,
+    errorMessage: String?,
+    onUpdate: () -> Unit,
+    onDismiss: () -> Unit,
+    onErrorDismiss: () -> Unit
+) {
+    if (errorMessage != null) {
+        AlertDialog(
+            onDismissRequest = onErrorDismiss,
+            containerColor = NavyCard,
+            title = { Text("Update failed", color = OnNavy) },
+            text = { Text(errorMessage, color = OnNavyVariant) },
+            confirmButton = {
+                TextButton(onClick = onErrorDismiss) {
+                    Text("OK", color = TealPrimary)
+                }
+            }
+        )
+        return
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (downloadProgress == null) onDismiss() },
+        containerColor = NavyCard,
+        icon = {
+            Icon(
+                Icons.Filled.SystemUpdateAlt,
+                contentDescription = null,
+                tint = TealPrimary,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                "New version available",
+                color = OnNavy,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Version $version is ready to install.", color = OnNavyVariant)
+                if (downloadProgress != null) {
+                    LinearProgressIndicator(
+                        progress = { downloadProgress / 100f },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = TealPrimary,
+                        trackColor = NavyCardElevated
+                    )
+                    Text(
+                        "Downloading… $downloadProgress%",
+                        color = OnNavyVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (downloadProgress == null) {
+                Button(
+                    onClick = onUpdate,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = TealPrimary,
+                        contentColor = OnTeal
+                    )
+                ) {
+                    Text("Update Now", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        },
+        dismissButton = {
+            if (downloadProgress == null) {
+                TextButton(onClick = onDismiss) {
+                    Text("Later", color = OnNavyVariant)
+                }
+            }
+        }
+    )
 }
