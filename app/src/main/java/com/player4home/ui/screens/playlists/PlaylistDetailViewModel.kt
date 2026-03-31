@@ -36,7 +36,8 @@ data class PlaylistDetailUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val selectedTab: ChannelTab = ChannelTab.ALL,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val pinnedGroups: Set<String> = emptySet()
 )
 
 @HiltViewModel
@@ -59,6 +60,7 @@ class PlaylistDetailViewModel @Inject constructor(
     private val _selectedTab  = MutableStateFlow(initialTab)
     private val _searchQuery  = MutableStateFlow("")
     private val _selectedGroup = MutableStateFlow<String?>(null)
+    private val _pinnedGroups = MutableStateFlow<Set<String>>(emptySet())
 
     private val _uiState = MutableStateFlow(PlaylistDetailUiState())
     val uiState: StateFlow<PlaylistDetailUiState> = _uiState.asStateFlow()
@@ -68,7 +70,8 @@ class PlaylistDetailViewModel @Inject constructor(
         val channels: List<Channel>,
         val tab: ChannelTab,
         val query: String,
-        val selectedGroup: String?
+        val selectedGroup: String?,
+        val pinnedGroups: Set<String>
     )
 
     init {
@@ -84,7 +87,7 @@ class PlaylistDetailViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
-        combine(_allChannels, _selectedTab, _searchQuery, _selectedGroup) { channels, tab, query, group ->
+        combine(_allChannels, _selectedTab, _searchQuery, _selectedGroup, _pinnedGroups) { channels, tab, query, group, pinned ->
             val tabFiltered = when (tab) {
                 ChannelTab.ALL    -> channels
                 ChannelTab.LIVE   -> channels.filter { it.streamType == StreamType.LIVE }
@@ -92,8 +95,14 @@ class PlaylistDetailViewModel @Inject constructor(
                 ChannelTab.SERIES -> channels.filter { it.streamType == StreamType.SERIES }
             }
             val groupedMap = tabFiltered.groupBy { it.groupTitle.ifEmpty { "—" } }
+            // pinned groups sort to top, then alphabetical
+            val sortedEntries = groupedMap.entries
+                .sortedWith(
+                    compareByDescending<Map.Entry<String, List<Channel>>> { it.key in pinned }
+                        .thenBy { it.key }
+                )
             val groups = listOf("ALL" to tabFiltered.size) +
-                         groupedMap.entries.map { it.key to it.value.size }
+                         sortedEntries.map { it.key to it.value.size }
 
             val groupFiltered = if (group == null) tabFiltered
                                 else groupedMap[group] ?: tabFiltered
@@ -101,16 +110,17 @@ class PlaylistDetailViewModel @Inject constructor(
             val displayed = if (query.isBlank()) groupFiltered
                             else groupFiltered.filter { it.name.contains(query, ignoreCase = true) }
 
-            ComputedState(groups, displayed, tab, query, group)
+            ComputedState(groups, displayed, tab, query, group, pinned)
         }
-            .onEach { (groups, channels, tab, query, group) ->
+            .onEach { (groups, channels, tab, query, group, pinned) ->
                 _uiState.update {
                     it.copy(
                         groups = groups,
                         channels = channels,
                         selectedTab = tab,
                         searchQuery = query,
-                        selectedGroup = group
+                        selectedGroup = group,
+                        pinnedGroups = pinned
                     )
                 }
             }
@@ -128,6 +138,12 @@ class PlaylistDetailViewModel @Inject constructor(
 
     fun onSearch(query: String) {
         _searchQuery.value = query
+    }
+
+    fun onTogglePin(group: String) {
+        _pinnedGroups.update { current ->
+            if (group in current) current - group else current + group
+        }
     }
 
     fun refresh() {

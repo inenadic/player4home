@@ -3,12 +3,16 @@ package com.player4home.ui.screens.home
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,8 +34,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -56,7 +63,6 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Update dialog
     uiState.updateAvailable?.let { update ->
         UpdateDialog(
             version = update.latestVersion,
@@ -127,164 +133,218 @@ private fun HomeDashboard(
 ) {
     val timeText = rememberLiveClock()
 
-    Column(
+    val orbTransition = rememberInfiniteTransition(label = "orb_transition")
+    val orbPhase by orbTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 12000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb_phase"
+    )
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .drawBehind {
+                val w = size.width
+                val h = size.height
+
+                // Teal orb — drifts from top-left toward center-left
+                val tealCenterX = w * 0.05f + w * 0.25f * orbPhase
+                val tealCenterY = h * 0.05f + h * 0.15f * orbPhase
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF00BFA5).copy(alpha = 0.30f),
+                            Color(0xFF00BFA5).copy(alpha = 0.10f),
+                            Color.Transparent
+                        ),
+                        center = Offset(tealCenterX, tealCenterY),
+                        radius = w * 0.55f
+                    ),
+                    radius = w * 0.55f,
+                    center = Offset(tealCenterX, tealCenterY)
+                )
+
+                // Purple orb — drifts from bottom-right toward center-right
+                val purpleCenterX = w * 0.95f - w * 0.20f * orbPhase
+                val purpleCenterY = h * 0.95f - h * 0.15f * orbPhase
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF7B61FF).copy(alpha = 0.28f),
+                            Color(0xFF7B61FF).copy(alpha = 0.08f),
+                            Color.Transparent
+                        ),
+                        center = Offset(purpleCenterX, purpleCenterY),
+                        radius = w * 0.50f
+                    ),
+                    radius = w * 0.50f,
+                    center = Offset(purpleCenterX, purpleCenterY)
+                )
+            }
     ) {
-        // ── Header ──────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Left: logo + app name
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.PlayCircle,
-                    contentDescription = null,
-                    tint = TealPrimary,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = OnNavy
-                )
-            }
-
-            // Center: live date + time
-            Text(
-                text = timeText,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f)
-            )
-
-            // Right: add playlist + settings icon buttons
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
-                modifier = Modifier.weight(1f)
-            ) {
-                IconButton(onClick = { navController.navigate(Screen.Upload.route) }) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = "Add playlist",
-                        tint = TealPrimary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
-                    Icon(
-                        imageVector = Icons.Filled.Settings,
-                        contentDescription = "Settings",
-                        tint = OnNavyVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // ── Main grid ───────────────────────────────────────────
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-            // Left: Live TV — tall tile spanning full height
-            TopCategoryTile(
+            // ── Header ──────────────────────────────────────────────
+            Row(
                 modifier = Modifier
-                    .weight(1.2f)
-                    .fillMaxHeight(),
-                label = "Live TV",
-                icon = Icons.Filled.Tv,
-                gradient = Brush.linearGradient(
-                    listOf(Color(0xFF00BFA5), Color(0xFF006064))
-                ),
-                onClick = {
-                    navController.navigate(
-                        Screen.PlaylistDetail.createRoute(playlistId, "LIVE")
-                    )
-                }
-            )
-
-            Spacer(Modifier.width(12.dp))
-
-            // Right: 2-row column
-            Column(modifier = Modifier.weight(2f)) {
-                // Top row: Movies + Series (equal height)
+                    .fillMaxWidth()
+                    .height(48.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: logo + app name
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    TopCategoryTile(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                        label = "Movies",
-                        icon = Icons.Filled.Movie,
-                        gradient = Brush.linearGradient(
-                            listOf(Color(0xFFFF7043), Color(0xFFE53935))
-                        ),
-                        onClick = {
-                            navController.navigate(
-                                Screen.PlaylistDetail.createRoute(playlistId, "VOD")
-                            )
-                        }
+                    Icon(
+                        imageVector = Icons.Filled.PlayCircle,
+                        contentDescription = null,
+                        tint = TealPrimary,
+                        modifier = Modifier.size(28.dp)
                     )
-                    Spacer(Modifier.width(12.dp))
-                    TopCategoryTile(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                        label = "Series",
-                        icon = Icons.Filled.VideoLibrary,
-                        gradient = Brush.linearGradient(
-                            listOf(Color(0xFF7B61FF), Color(0xFF4527A0))
-                        ),
-                        onClick = {
-                            navController.navigate(
-                                Screen.PlaylistDetail.createRoute(playlistId, "SERIES")
-                            )
-                        }
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = OnNavy
                     )
                 }
 
-                Spacer(Modifier.height(12.dp))
+                // Center: live date + time
+                Text(
+                    text = timeText,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
+                )
 
-                // Bottom row: Settings + Playlists flat buttons
+                // Right: add playlist + settings icon buttons
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(0.5f)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    BottomCategoryTile(
+                    IconButton(onClick = { navController.navigate(Screen.Upload.route) }) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = "Add playlist",
+                            tint = TealPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Settings",
+                            tint = OnNavyVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // ── Main grid ───────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                // Left: Live TV — tall tile spanning full height
+                TopCategoryTile(
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .fillMaxHeight(),
+                    label = "Live TV",
+                    icon = Icons.Filled.Tv,
+                    gradient = Brush.linearGradient(
+                        listOf(Color(0xFF00BFA5), Color(0xFF006064))
+                    ),
+                    onClick = {
+                        navController.navigate(
+                            Screen.PlaylistDetail.createRoute(playlistId, "LIVE")
+                        )
+                    }
+                )
+
+                Spacer(Modifier.width(12.dp))
+
+                // Right: 2-row column
+                Column(modifier = Modifier.weight(2f)) {
+                    // Top row: Movies + Series (equal height)
+                    Row(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .weight(1f)
-                            .fillMaxHeight(),
-                        label = "Settings",
-                        icon = Icons.Filled.Settings,
-                        onClick = { navController.navigate(Screen.Settings.route) }
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    BottomCategoryTile(
+                    ) {
+                        TopCategoryTile(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            label = "Movies",
+                            icon = Icons.Filled.Movie,
+                            gradient = Brush.linearGradient(
+                                listOf(Color(0xFFFF7043), Color(0xFFE53935))
+                            ),
+                            onClick = {
+                                navController.navigate(
+                                    Screen.PlaylistDetail.createRoute(playlistId, "VOD")
+                                )
+                            }
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        TopCategoryTile(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            label = "Series",
+                            icon = Icons.Filled.VideoLibrary,
+                            gradient = Brush.linearGradient(
+                                listOf(Color(0xFF7B61FF), Color(0xFF4527A0))
+                            ),
+                            onClick = {
+                                navController.navigate(
+                                    Screen.PlaylistDetail.createRoute(playlistId, "SERIES")
+                                )
+                            }
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Bottom row: Settings + Playlists flat buttons
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                        label = "Playlists",
-                        icon = Icons.AutoMirrored.Filled.List,
-                        onClick = { navController.navigate(Screen.Playlists.route) }
-                    )
+                            .fillMaxWidth()
+                            .weight(0.5f)
+                    ) {
+                        BottomCategoryTile(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            label = "Settings",
+                            icon = Icons.Filled.Settings,
+                            onClick = { navController.navigate(Screen.Settings.route) }
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        BottomCategoryTile(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            label = "Playlists",
+                            icon = Icons.AutoMirrored.Filled.List,
+                            onClick = { navController.navigate(Screen.Playlists.route) }
+                        )
+                    }
                 }
             }
         }
@@ -312,12 +372,25 @@ private fun TopCategoryTile(
         label = "shimmerAlpha_$label"
     )
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(),
+        label = "scale_$label"
+    )
+
     Box(
         modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(20.dp))
             .border(1.dp, CardBorder, RoundedCornerShape(20.dp))
             .background(gradient)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
     ) {
         // Shimmer highlight at top
         Box(
@@ -383,12 +456,25 @@ private fun BottomCategoryTile(
     icon: ImageVector,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(),
+        label = "scale_$label"
+    )
+
     Box(
         modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(16.dp))
             .border(1.dp, Color(0xFF1E5C47), RoundedCornerShape(16.dp))
             .background(Color(0xFF0D2B22))
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Row(

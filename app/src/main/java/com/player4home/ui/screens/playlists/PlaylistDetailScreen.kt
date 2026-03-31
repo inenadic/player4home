@@ -1,8 +1,12 @@
 package com.player4home.ui.screens.playlists
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,10 +17,21 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.ChildCare
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SportsSoccer
+import androidx.compose.material.icons.filled.Theaters
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +57,31 @@ import com.player4home.data.model.StreamType
 import com.player4home.ui.components.ChannelRow
 import com.player4home.ui.navigation.Screen
 import com.player4home.ui.theme.*
+
+private fun categoryIcon(name: String): ImageVector = when {
+    name == "ALL"                                                       -> Icons.Filled.GridView
+    name.contains("sport",    ignoreCase = true) ||
+    name.contains("football", ignoreCase = true) ||
+    name.contains("soccer",   ignoreCase = true) ||
+    name.contains("tennis",   ignoreCase = true) ||
+    name.contains("basket",   ignoreCase = true)                       -> Icons.Filled.SportsSoccer
+    name.contains("news",     ignoreCase = true)                       -> Icons.Filled.Newspaper
+    name.contains("movie",    ignoreCase = true) ||
+    name.contains("film",     ignoreCase = true) ||
+    name.contains("cinema",   ignoreCase = true)                       -> Icons.Filled.Movie
+    name.contains("series",   ignoreCase = true) ||
+    name.contains("show",     ignoreCase = true) ||
+    name.contains("episode",  ignoreCase = true)                       -> Icons.Filled.VideoLibrary
+    name.contains("music",    ignoreCase = true) ||
+    name.contains("radio",    ignoreCase = true)                       -> Icons.Filled.MusicNote
+    name.contains("kids",     ignoreCase = true) ||
+    name.contains("child",    ignoreCase = true) ||
+    name.contains("cartoon",  ignoreCase = true) ||
+    name.contains("anime",    ignoreCase = true)                       -> Icons.Filled.ChildCare
+    name.contains("docu",     ignoreCase = true)                       -> Icons.Filled.AutoStories
+    name.contains("entertain",ignoreCase = true)                       -> Icons.Filled.Theaters
+    else                                                               -> Icons.Filled.Folder
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -138,7 +180,9 @@ fun PlaylistDetailScreen(
                         .fillMaxHeight(),
                     groups = uiState.groups,
                     selectedGroup = uiState.selectedGroup,
-                    onGroupSelected = { viewModel.onGroupSelected(it) }
+                    onGroupSelected = { viewModel.onGroupSelected(it) },
+                    pinnedGroups = uiState.pinnedGroups,
+                    onTogglePin = { viewModel.onTogglePin(it) }
                 )
 
                 // Panel divider
@@ -207,7 +251,9 @@ private fun CategoriesPanel(
     modifier: Modifier,
     groups: List<Pair<String, Int>>,
     selectedGroup: String?,
-    onGroupSelected: (String?) -> Unit
+    onGroupSelected: (String?) -> Unit,
+    pinnedGroups: Set<String>,
+    onTogglePin: (String) -> Unit
 ) {
     var filterText by remember { mutableStateOf("") }
     val visible = if (filterText.isBlank()) groups
@@ -270,7 +316,9 @@ private fun CategoriesPanel(
                     name = name,
                     count = count,
                     isSelected = isSelected,
-                    onClick = { onGroupSelected(if (name == "ALL") null else name) }
+                    onClick = { onGroupSelected(if (name == "ALL") null else name) },
+                    isPinned = name in pinnedGroups,
+                    onTogglePin = if (name == "ALL") null else ({ onTogglePin(name) })
                 )
             }
         }
@@ -282,7 +330,9 @@ private fun CategoryItem(
     name: String,
     count: Int,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isPinned: Boolean = false,
+    onTogglePin: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -331,6 +381,19 @@ private fun CategoryItem(
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                 fontSize = 10.sp
             )
+        }
+        if (onTogglePin != null) {
+            IconButton(
+                onClick = onTogglePin,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                    contentDescription = if (isPinned) "Unpin category" else "Pin category",
+                    tint = if (isPinned) AmberSecondary else OnNavySubtle,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
     HorizontalDivider(
@@ -422,7 +485,7 @@ private fun VodGrid(
     onChannelClick: (Channel) -> Unit
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 140.dp),
+        columns = GridCells.Adaptive(minSize = 120.dp),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -452,20 +515,29 @@ private fun VodPosterCard(channel: Channel, onClick: () -> Unit) {
         StreamType.LIVE   -> Icons.Filled.PlayArrow
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.94f else 1f,
+        animationSpec = spring(),
+        label = "cardScale"
+    )
+
     Card(
         modifier = Modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = NavyCard),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column {
-            // Thumbnail / poster area (16:9 aspect)
+            // Thumbnail / poster area (2:3 portrait aspect)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
+                    .aspectRatio(2f / 3f)
             ) {
                 if (channel.logoUrl.isNotEmpty()) {
                     AsyncImage(
